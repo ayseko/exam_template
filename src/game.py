@@ -1,28 +1,61 @@
-from src.grid import Grid
-from src.player import Player
 from src import pickups
+from src.screen import print_status
+from src.state import GameState
 
 
-# TODO: flytta denna till en annan fil
-class GameState:
-    """Samla spelets variabler i en klass."""
-    def __init__(self):
-        self.player = Player(2, 1)
-        self.score = 0
-        self.inventory = []
+def handle_move(state, dx, dy):
+    new_x = state.player.pos_x + dx
+    new_y = state.player.pos_y + dy
 
-        self.g = Grid()
-        self.g.set_player(self.player)
-        self.g.make_walls()
-        pickups.randomize(self.g)
+    # KONTROLL: Väggkollision och användning av spade
+    if not (0 <= new_x < state.g.width and 0 <= new_y < state.g.height):
+        return
+    if state.g.get(new_x, new_y) == state.g.wall:
+        for item in state.inventory:
+            if item.name == "spade":
+                state.g.set(new_x, new_y, state.g.empty)
+                print("🪓 You used a spade and broke the wall!")
+                break
+        else:
+            return
 
+        # MOVE
+    state.player.move(dx, dy)
+    state.score -= 1
 
-# TODO: flytta denna till en annan fil
-def print_status(game_grid, state):
-    """Visa spelvärlden och antal poäng."""
-    print("--------------------------------------")
-    print(f"You have {state.score} points.")
-    print(game_grid)
+    maybe_item = state.g.get(new_x, new_y)
+
+    if isinstance(maybe_item, pickups.Item):
+
+        if maybe_item.item_type == "tool":
+            state.inventory.append(maybe_item)
+            state.g.clear(new_x, new_y)
+            print(f" You found a {maybe_item.name}!")
+
+        elif maybe_item.item_type == "key":
+            state.inventory.append(maybe_item)
+            state.g.clear(new_x, new_y)
+            print(f" You found a {maybe_item.name}!")
+
+        elif maybe_item.item_type == "chest":
+            for item in state.inventory:
+                if item.item_type == "key":
+                    state.inventory.remove(item)
+                    state.score += 100
+                    state.g.clear(new_x, new_y)
+                    print("Chest opened! +100 points")
+                    break
+            else:
+                print("Chest is locked. You need a key.")
+
+        else:
+            state.score += maybe_item.value
+            state.inventory.append(maybe_item)
+            state.g.clear(new_x, new_y)
+
+    if state.score < 0:
+        print("Game Over!")
+        exit()
 
 
 def start(state):
@@ -34,18 +67,25 @@ def start(state):
         command = input("Use WASD to move, Q/X to quit. ")
         command = command.casefold()[:1]
 
-        if command == "d" and state.player.can_move(1, 0, state.g):  # move right
-            # TODO: skapa funktioner, så vi inte behöver upprepa så mycket kod för riktningarna "W,A,S"
-            maybe_item = state.g.get(state.player.pos_x + 1, state.player.pos_y)
-            state.player.move(1, 0)
+        if command == "w":
+            handle_move(state, 0, -1)
 
-            if isinstance(maybe_item, pickups.Item):
-                # we found something
-                state.score += maybe_item.value
-                print(f"You found a {maybe_item.name}, +{maybe_item.value} points.")
-                #g.set(player.pos_x, player.pos_y, g.empty)
-                state.g.clear(state.player.pos_x, state.player.pos_y)
+        elif command == "a":
+            handle_move(state, -1, 0)
 
+        elif command == "s":
+            handle_move(state, 0, 1)
+
+        elif command == "d":
+            handle_move(state, 1, 0)
+
+        elif command == "i":
+            print("Inventory:")
+            if len(state.inventory) == 0:
+                print("Empty")
+            else:
+                for item in state.inventory:
+                    print(f"- {item.name} ({item.value} points)")
 
     # Hit kommer vi när while-loopen slutar
     print("Thank you for playing!")
