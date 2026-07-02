@@ -14,7 +14,7 @@ def handle_move(state, dx, dy):
         for item in state.inventory:
             if item.name == "spade":
                 state.g.set(new_x, new_y, state.g.empty)
-                print("🪓 You used a spade and broke the wall!")
+                print("You used a spade and broke the wall!")
                 break
         else:
             return
